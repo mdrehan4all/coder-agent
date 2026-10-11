@@ -1,0 +1,136 @@
+import OpenAI from "openai";
+import PromptSync from "prompt-sync";
+import { tools, getTime, getWeather, createFile } from './tools.js';
+
+const prompt = PromptSync();
+
+const MODEL_NAME = 'gemma4:26b'; // Replace with your desired model name
+
+const openai = new OpenAI({
+  baseURL: 'http://localhost:11434/v1',
+  apiKey: 'ollama',
+});
+
+
+// Function execution logic
+async function executeTool(toolName, args) {
+  if (toolName === "get_current_weather") return getWeather(args);
+  if (toolName === "get_current_time") return getTime(args);
+  if (toolName === "create_file") return await createFile(args.filePath, args.content);
+  if (toolName === "update_file") return await updateFile(args.filePath, args.content);
+  if (toolName === "delete_file") return await deleteFile(args.filePath);
+  if (toolName === "rename_file") return await renameFile(args.oldPath, args.newPath);
+  if (toolName === "create_folder") return await createFolder(args.folderPath);
+  if (toolName === "rename_folder") return await renameFolder(args.oldPath, args.newPath);
+  if (toolName === "delete_folder") return await deleteFolder(args.folderPath);
+  
+  return JSON.stringify({ error: "Tool not found" });
+}
+
+// Helper function to handle streaming chat completions
+async function streamChatCompletion(model, messages, tools = undefined) {
+  const stream = await openai.chat.completions.create({
+    model: model,
+    think: false,
+    reasoning_effort: 'none',
+    messages: messages,
+    tools: tools,
+    stream: true,
+    // stream_options: { include_usage: true }
+  });
+
+  let fullContent = "";
+  let fullReasoning = "";
+  let toolCallsMap = {};
+
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta;
+    if (!delta) continue;
+
+    if (delta.reasoning) {
+      process.stdout.write("\x1b[32m"+delta.reasoning+"\x1b[0m");
+      fullReasoning += delta.reasoning;
+    }
+
+    if (delta.content) {
+      process.stdout.write(delta.content);
+      fullContent += delta.content;
+    }
+
+    if (delta.tool_calls) {
+      for (const tc of delta.tool_calls) {
+        const index = tc.index;
+        if (!toolCallsMap[index]) {
+          toolCallsMap[index] = { id: "", type: "function", function: { name: "", arguments: "" } };
+        }
+        if (tc.id) toolCallsMap[index].id += tc.id;
+        if (tc.function?.name) toolCallsMap[index].function.name += tc.function.name;
+        if (tc.function?.arguments) toolCallsMap[index].function.arguments += tc.function.arguments;
+      }
+    }
+  }
+
+  console.log("\n");
+
+  const tool_calls = Object.keys(toolCallsMap).length > 0 
+    ? Object.values(toolCallsMap) 
+    : undefined;
+
+  return {
+    role: "assistant",
+    content: fullContent || null,
+    tool_calls: tool_calls
+  };
+}
+
+let messages = [
+    { role: "system", content: 'You are a helpful assistant running in local environment and you have access to various tools if needed you can call multiple tools in same time.' }
+];
+// 5. Run the Local Agent Loop
+async function runLocalAgent(userPrompt) {
+  messages.push({ role: "user", content: userPrompt });
+
+  messages.push({ role: "user", content: 'Create a task list to perform the requested actions make it clear and small.' });
+  const startResponseMessage = await streamChatCompletion(MODEL_NAME, messages);
+  messages.push(startResponseMessage);
+
+  console.log(`User Goal: "${userPrompt}"\n---`);
+  console.log("🤖 [Agent Thinking & Responding]:");
+
+  let responseMessage = await streamChatCompletion(MODEL_NAME, messages, tools);
+  messages.push(responseMessage);
+  console.log("[Agent Response Object]:", responseMessage);
+
+  if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+    for (const toolCall of responseMessage.tool_calls) {
+      const functionName = toolCall.function.name;
+      const functionArgs = JSON.parse(toolCall.function.arguments);
+
+      console.log(`🛠️ Local Agent decided to use tool: ${functionName} with args:`, functionArgs);
+
+      // Await the asynchronous tool execution
+      const toolResult = await executeTool(functionName, functionArgs);
+      console.log(`🛠️ Tool Output: ${toolResult}\n---`);
+
+      messages.push({
+        role: "tool",
+        tool_call_id: toolCall.id,
+        content: toolResult,
+      });
+    }
+
+    console.log("🤖 [Agent Processing Tool Output]:");
+
+    const secondResponseMessage = await streamChatCompletion(MODEL_NAME, messages);
+    messages.push(secondResponseMessage);
+  }
+}
+
+// Execute the agent locally
+while (true) {
+  const message = prompt("Enter your message: ");
+  if (message === 'exit') {
+    break;
+  }
+  await runLocalAgent(message);
+}
