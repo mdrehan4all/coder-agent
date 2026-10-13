@@ -1,10 +1,10 @@
 import OpenAI from "openai";
 import PromptSync from "prompt-sync";
-import { tools, getTime, getWeather, createFile } from './tools.js';
+import { tools, getTime, getWeather, readFile, createOrWriteFile, createOrAppendFile, deleteFile, renameFile, createFolder, renameFolder, deleteFolder, listDirectory } from './tools.js';
 
 const prompt = PromptSync();
 
-const MODEL_NAME = 'gemma4:26b'; // Replace with your desired model name
+const MODEL_NAME = 'myqwen30b:latest'; //'gemma4:26b'; // Replace with your desired model name
 
 const openai = new OpenAI({
   baseURL: 'http://localhost:11434/v1',
@@ -16,14 +16,17 @@ const openai = new OpenAI({
 async function executeTool(toolName, args) {
   if (toolName === "get_current_weather") return getWeather(args);
   if (toolName === "get_current_time") return getTime(args);
-  if (toolName === "create_file") return await createFile(args.filePath, args.content);
-  if (toolName === "update_file") return await updateFile(args.filePath, args.content);
+  // File and Folder Tool Implementations
+  if (toolName === "read_file") return await readFile(args.filePath);
+  if (toolName === "write_file") return await createOrWriteFile(args.filePath, args.content);
+  if (toolName === "append_file") return await createOrAppendFile(args.filePath, args.content);
   if (toolName === "delete_file") return await deleteFile(args.filePath);
   if (toolName === "rename_file") return await renameFile(args.oldPath, args.newPath);
   if (toolName === "create_folder") return await createFolder(args.folderPath);
   if (toolName === "rename_folder") return await renameFolder(args.oldPath, args.newPath);
   if (toolName === "delete_folder") return await deleteFolder(args.folderPath);
-  
+  if (toolName === "list_directory") return await listDirectory(args.directoryPath);
+
   return JSON.stringify({ error: "Tool not found" });
 }
 
@@ -36,6 +39,7 @@ async function streamChatCompletion(model, messages, tools = undefined) {
     messages: messages,
     tools: tools,
     stream: true,
+    tool_choice: 'auto',
     // stream_options: { include_usage: true }
   });
 
@@ -90,9 +94,9 @@ let messages = [
 async function runLocalAgent(userPrompt) {
   messages.push({ role: "user", content: userPrompt });
 
-  messages.push({ role: "user", content: 'Create a task list to perform the requested actions make it clear and small.' });
-  const startResponseMessage = await streamChatCompletion(MODEL_NAME, messages);
-  messages.push(startResponseMessage);
+  //messages.push({ role: "user", content: 'Create a task list to perform the requested actions make it clear and small.' });
+  //const startResponseMessage = await streamChatCompletion(MODEL_NAME, messages);
+  //messages.push(startResponseMessage);
 
   console.log(`User Goal: "${userPrompt}"\n---`);
   console.log("🤖 [Agent Thinking & Responding]:");

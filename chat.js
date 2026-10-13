@@ -1,106 +1,36 @@
 import OpenAI from "openai";
 import PromptSync from "prompt-sync";
-import { writeFile, appendFile, rm, rename, mkdir } from 'node:fs/promises';
+import { tools, getTime, getWeather, readFile, createOrWriteFile, createOrAppendFile, deleteFile, renameFile, createFolder, renameFolder, deleteFolder, listDirectory } from './tools.js';
+
 const prompt = PromptSync();
 
-const MODEL_NAME = 'ornith:latest'; // Replace with your desired model name
+const MODEL_NAME = 'myqwen30b:latest'; //'gemma4:26b'; // Replace with your desired model name
 
-// 1. Initialize the OpenAI client pointing to your local Ollama instance
 const openai = new OpenAI({
   baseURL: 'http://localhost:11434/v1',
   apiKey: 'ollama',
 });
 
-function getWeather(args){
-    return JSON.stringify({ 
-      location: args.location, 
-      temperature: "68°F", 
-      condition: "Partly Cloudy" 
-    });
-}
 
-// File and Folder Tool Implementations
-async function createFile(filePath, content) {
-  try {
-    await writeFile(filePath, content, 'utf8');
-    return `Successfully created file: ${filePath}`;
-  } catch (error) {
-    return `Failed to create file: ${error.message}`;
-  }
-}
-
-async function updateFile(filePath, content) {
-  try {
-    await appendFile(filePath, content, 'utf8');
-    return `Successfully updated file: ${filePath}`;
-  } catch (error) {
-    return `Failed to update file: ${error.message}`;
-  }
-}
-
-async function deleteFile(filePath) {
-  try {
-    await rm(filePath, { force: true });
-    return `Successfully deleted file: ${filePath}`;
-  } catch (error) {
-    return `Failed to delete file: ${error.message}`;
-  }
-}
-
-async function renameFile(oldPath, newPath) {
-  try {
-    await rename(oldPath, newPath);
-    return `Successfully renamed file from ${oldPath} to ${newPath}`;
-  } catch (error) {
-    return `Failed to rename file: ${error.message}`;
-  }
-}
-
-async function createFolder(folderPath) {
-  try {
-    await mkdir(folderPath, { recursive: true });
-    return `Successfully created folder: ${folderPath}`;
-  } catch (error) {
-    return `Failed to create folder: ${error.message}`;
-  }
-}
-
-async function renameFolder(oldPath, newPath) {
-  try {
-    await rename(oldPath, newPath);
-    return `Successfully renamed folder from ${oldPath} to ${newPath}`;
-  } catch (error) {
-    return `Failed to rename folder: ${error.message}`;
-  }
-}
-
-async function deleteFolder(folderPath) {
-  try {
-    await rm(folderPath, { recursive: true, force: true });
-    return `Successfully deleted folder: ${folderPath}`;
-  } catch (error) {
-    return `Failed to delete folder: ${error.message}`;
-  }
-}
-
-// 2. Define custom tools the local agent can use
-const tools = 
-
-// 3. Mock function execution logic
+// Function execution logic
 async function executeTool(toolName, args) {
   if (toolName === "get_current_weather") return getWeather(args);
-  if (toolName === "create_file") return await createFile(args.filePath, args.content);
-  if (toolName === "update_file") return await updateFile(args.filePath, args.content);
+  if (toolName === "get_current_time") return getTime(args);
+  // File and Folder Tool Implementations
+  if (toolName === "read_file") return await readFile(args.filePath);
+  if (toolName === "write_file") return await createOrWriteFile(args.filePath, args.content);
+  if (toolName === "append_file") return await createOrAppendFile(args.filePath, args.content);
   if (toolName === "delete_file") return await deleteFile(args.filePath);
   if (toolName === "rename_file") return await renameFile(args.oldPath, args.newPath);
   if (toolName === "create_folder") return await createFolder(args.folderPath);
   if (toolName === "rename_folder") return await renameFolder(args.oldPath, args.newPath);
   if (toolName === "delete_folder") return await deleteFolder(args.folderPath);
-  
+  if (toolName === "list_directory") return await listDirectory(args.directoryPath);
+
   return JSON.stringify({ error: "Tool not found" });
 }
 
-// 4. Helper function to handle streaming chat completions
+// Helper function to handle streaming chat completions
 async function streamChatCompletion(model, messages, tools = undefined) {
   const stream = await openai.chat.completions.create({
     model: model,
@@ -109,7 +39,8 @@ async function streamChatCompletion(model, messages, tools = undefined) {
     messages: messages,
     tools: tools,
     stream: true,
-    stream_options: { include_usage: true }
+    tool_choice: 'auto',
+    // stream_options: { include_usage: true }
   });
 
   let fullContent = "";
@@ -156,16 +87,23 @@ async function streamChatCompletion(model, messages, tools = undefined) {
   };
 }
 
-let messages = [];
+let messages = [
+    { role: "system", content: 'You are a helpful assistant running in local environment and you have access to various tools if needed you can call multiple tools in same time.' }
+];
 // 5. Run the Local Agent Loop
 async function runLocalAgent(userPrompt) {
   messages.push({ role: "user", content: userPrompt });
 
+  //messages.push({ role: "user", content: 'Create a task list to perform the requested actions make it clear and small.' });
+  //const startResponseMessage = await streamChatCompletion(MODEL_NAME, messages);
+  //messages.push(startResponseMessage);
+
   console.log(`User Goal: "${userPrompt}"\n---`);
   console.log("🤖 [Agent Thinking & Responding]:");
 
-  let responseMessage = await streamChatCompletion('gemma4:12b', messages, tools);
+  let responseMessage = await streamChatCompletion(MODEL_NAME, messages, tools);
   messages.push(responseMessage);
+  console.log("[Agent Response Object]:", responseMessage);
 
   if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
     for (const toolCall of responseMessage.tool_calls) {
@@ -187,7 +125,7 @@ async function runLocalAgent(userPrompt) {
 
     console.log("🤖 [Agent Processing Tool Output]:");
 
-    const secondResponseMessage = await streamChatCompletion('gemma4:12b', messages);
+    const secondResponseMessage = await streamChatCompletion(MODEL_NAME, messages);
     messages.push(secondResponseMessage);
   }
 }

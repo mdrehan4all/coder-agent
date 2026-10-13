@@ -30,12 +30,26 @@ export const tools = [
   {
     type: "function",
     function: {
-      name: "create_file",
-      description: "Create a new file with the specified content",
+      name: "read_file",
+      description: "Read the content of a specified file",
       parameters: {
         type: "object",
         properties: {
-          filePath: { type: "string", description: "Path or name of the file to create" },
+          filePath: { type: "string", description: "Path or name of the file to read" },
+        },
+        required: ["filePath"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_file",
+      description: "Create a new file with the specified content or overwrite an existing file",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: { type: "string", description: "Path or name of the file to create or overwrite" },
           content: { type: "string", description: "Content to write into the file" },
         },
         required: ["filePath", "content"],
@@ -45,7 +59,7 @@ export const tools = [
   {
     type: "function",
     function: {
-      name: "update_file",
+      name: "append_file",
       description: "Append content to an existing file",
       parameters: {
         type: "object",
@@ -128,6 +142,21 @@ export const tools = [
         required: ["folderPath"],
       },
     },
+  },
+  //list files and folders in a directory
+  {
+    type: "function",
+    function: {
+      name: "list_directory",
+      description: "List all files and folders in a specified directory",
+      parameters: {
+        type: "object",
+        properties: {
+          directoryPath: { type: "string", description: "Path to the directory to list" },
+        },
+        required: ["directoryPath"],
+      },
+    },
   }
 ];
 
@@ -143,11 +172,87 @@ export function getWeather(args) {
   return `Current weather of ${args.location} is sunny and temperature is 40°C.`;
 }
 
-export async function createFile(filePath, content) {
+export async function createOrWriteFile(filePath, content) {
   try {
     await writeFile(filePath, content, 'utf8');
-    return `Successfully created file: ${filePath}`;
+    return `Successfully created/overwritten file: ${filePath}`;
   } catch (error) {
     return `Failed to create file: ${error.message}`;
+  }
+}
+
+export async function readFile(filePath) {
+  try {
+    const data = await readFile(filePath, 'utf8');
+    return data;
+  } catch (error) {
+    return `Failed to read file: ${error.message}`;
+  }
+}
+
+export async function createOrAppendFile(filePath, content) {
+  try {
+    await appendFile(filePath, content, 'utf8');
+    return `Successfully appended to file: ${filePath}`;
+  } catch (error) {
+    return `Failed to append to file: ${error.message}`;
+  }
+}
+
+export async function deleteFile(filePath) {
+  try {
+    await rm(filePath, { force: true });
+    return `Successfully deleted file: ${filePath}`;
+  } catch (error) {
+    return `Failed to delete file: ${error.message}`;
+  }
+}
+
+export async function renameFile(oldPath, newPath) {
+  try {
+    await rename(oldPath, newPath);
+    return `Successfully renamed file from ${oldPath} to ${newPath}`;
+  } catch (error) {
+    return `Failed to rename file: ${error.message}`;
+  }
+}
+
+export async function createFolder(folderPath) {
+  try {
+    await mkdir(folderPath, { recursive: true });
+    return `Successfully created folder: ${folderPath}`;
+  } catch (error) {
+    return `Failed to create folder: ${error.message}`;
+  }
+}
+
+export async function renameFolder(oldPath, newPath) {
+  try {
+    await rename(oldPath, newPath);
+    return `Successfully renamed folder from ${oldPath} to ${newPath}`;
+  } catch (error) {
+    return `Failed to rename folder: ${error.message}`;
+  }
+}
+
+export async function deleteFolder(folderPath) {
+  try {
+    await rm(folderPath, { recursive: true, force: true });
+    return `Successfully deleted folder: ${folderPath}`;
+  } catch (error) {
+    return `Failed to delete folder: ${error.message}`;
+  }
+}
+
+export async function listDirectory(directoryPath) {
+  try {
+    const files = await readdir(directoryPath, { withFileTypes: true });
+    const fileList = files.map(file => ({
+      name: file.name,
+      type: file.isDirectory() ? 'folder' : 'file'
+    }));
+    return JSON.stringify(fileList);
+  } catch (error) {
+    return `Failed to list directory: ${error.message}`;
   }
 }
