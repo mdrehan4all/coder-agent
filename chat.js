@@ -1,10 +1,11 @@
 import OpenAI from "openai";
 import PromptSync from "prompt-sync";
-import { tools, getTime, getWeather, readFile, createOrWriteFile, createOrAppendFile, deleteFile, renameFile, createFolder, renameFolder, deleteFolder, listDirectory } from './tools.js';
+import { tools, getTime, getWeather, readFileData, createOrWriteFile, createOrAppendFile, deleteFile, renameFile, createFolder, renameFolder, deleteFolder, listDirectory } from './tools.js';
 
 const prompt = PromptSync();
 
-const MODEL_NAME = 'myqwen30b:latest'; //'gemma4:26b'; // Replace with your desired model name
+const MODEL_NAME = 'Qwen3-Coder-30B-A3B-Instruct-Q4_K_M:latest';
+//'nvidia_Nemotron-Cascade-2-30B-A3B-Q4_0:latest'; //'myqwen30b:latest'; //'gemma4:26b'; // Replace with your desired model name
 
 const openai = new OpenAI({
   baseURL: 'http://localhost:11434/v1',
@@ -17,7 +18,7 @@ async function executeTool(toolName, args) {
   if (toolName === "get_current_weather") return getWeather(args);
   if (toolName === "get_current_time") return getTime(args);
   // File and Folder Tool Implementations
-  if (toolName === "read_file") return await readFile(args.filePath);
+  if (toolName === "read_file") return await readFileData(args.filePath);
   if (toolName === "write_file") return await createOrWriteFile(args.filePath, args.content);
   if (toolName === "append_file") return await createOrAppendFile(args.filePath, args.content);
   if (toolName === "delete_file") return await deleteFile(args.filePath);

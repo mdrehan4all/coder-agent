@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import PromptSync from "prompt-sync";
-import { tools, getTime, getWeather, readFile, createOrWriteFile, createOrAppendFile, deleteFile, renameFile, createFolder, renameFolder, deleteFolder, listDirectory } from './tools.js';
+import { tools, getTime, getWeather, readFileData, createOrWriteFile, createOrAppendFile, deleteFile, renameFile, createFolder, renameFolder, deleteFolder, listDirectory } from './tools.js';
 
 const prompt = PromptSync();
 
@@ -17,7 +17,7 @@ async function executeTool(toolName, args) {
   if (toolName === "get_current_weather") return getWeather(args);
   if (toolName === "get_current_time") return getTime(args);
   // File and Folder Tool Implementations
-  if (toolName === "read_file") return await readFile(args.filePath);
+  if (toolName === "read_file") return await readFileData(args.filePath);
   if (toolName === "write_file") return await createOrWriteFile(args.filePath, args.content);
   if (toolName === "append_file") return await createOrAppendFile(args.filePath, args.content);
   if (toolName === "delete_file") return await deleteFile(args.filePath);

@@ -1,4 +1,4 @@
-import { writeFile, appendFile, rm, rename, mkdir } from 'node:fs/promises';
+import { writeFile, readFile, appendFile, rm, rename, mkdir } from 'node:fs/promises';
 
 export const tools = [
   {
@@ -181,7 +181,7 @@ export async function createOrWriteFile(filePath, content) {
   }
 }
 
-export async function readFile(filePath) {
+export async function readFileData(filePath) {
   try {
     const data = await readFile(filePath, 'utf8');
     return data;
