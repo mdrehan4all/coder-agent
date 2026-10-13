@@ -1,4 +1,4 @@
-import { writeFile, readFile, appendFile, rm, rename, mkdir } from 'node:fs/promises';
+import { writeFile, readFile, appendFile, rm, rename, mkdir, readdir } from 'node:fs/promises';
 
 export const tools = [
   {
